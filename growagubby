@@ -8,7 +8,7 @@ local Window = Fluent:CreateWindow({
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
-    Theme = "Dark",
+    Theme = "Rose",
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
@@ -381,66 +381,122 @@ local function tweenToPosition(part, goalPos, time)
 	end
 end
 
-local function startFastAutofarm()
-	autofarmEnabled = true
-	autofarmConnection = task.spawn(function()
-		while autofarmEnabled do
-			local char = player.Character
-			if not char then task.wait(1) continue end
 
-			local hrp = char:FindFirstChild("HumanoidRootPart")
-			if not hrp then
-				Fluent:Notify({
-					Title = "Fast Autofarm Error",
-					Content = "HumanoidRootPart not found.",
-					Duration = 4
-				})
-				task.wait(2)
-				continue
-			end
+local stepSize = 10 
+local tweenSpeed = 0.15 
+local squareCoords = {
+    Vector3.new(542.65, 19.60, -542.77),
+    Vector3.new(-544.96, 19.60, -545.01),
+    Vector3.new(-545.68, 19.60, 545.71),
+    Vector3.new(545.50, 19.60, 544.95)
+}
 
-			local orb = getFurthestOrb4(hrp.Position)
-			if not orb then
-				Fluent:Notify({
-					Title = "Fast Autofarm Info",
-					Content = "No orb named '4' found in workspace.Orbs.",
-					Duration = 3
-				})
-				task.wait(2)
-				continue
-			end
+local coverSquareEnabled = false
+local stopCoverSquare = false
+local HRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 
-			local destination = Vector3.new(orb.Position.X, hrp.Position.Y, orb.Position.Z)
-			local distance = (destination - hrp.Position).Magnitude
-			local travelTime = distance / 100 -- You can adjust speed here
-
-			tweenToPosition(hrp, destination, travelTime)
-
-			task.wait(0.2) -- slight delay before next search
-		end
-	end)
-end
-
-local function stopFastAutofarm()
-	autofarmEnabled = false
-	cancelCurrentTween()
-	if autofarmConnection then
-		task.cancel(autofarmConnection)
-		autofarmConnection = nil
-	end
-end
-
-local AutofarmToggle = Tabs.Main:AddToggle("FastAutofarmToggle", {
-	Title = "Fast Autofarm",
-	Default = false
-})
-AutofarmToggle:OnChanged(function(val)
-	if val then
-		startFastAutofarm()
-	else
-		stopFastAutofarm()
-	end
+player.CharacterAdded:Connect(function(char)
+    HRP = char:WaitForChild("HumanoidRootPart")
 end)
+
+local function coverSquare()
+    local minX, maxX = math.huge, -math.huge
+    local minZ, maxZ = math.huge, -math.huge
+    local y = squareCoords[1].Y
+
+    for _, v in ipairs(squareCoords) do
+        if v.X < minX then minX = v.X end
+        if v.X > maxX then maxX = v.X end
+        if v.Z < minZ then minZ = v.Z end
+        if v.Z > maxZ then maxZ = v.Z end
+    end
+
+    for x = minX, maxX, stepSize do
+        for z = minZ, maxZ, stepSize do
+            if stopCoverSquare then return end
+            local goal = {CFrame = CFrame.new(x, y, z)}
+            local tween = game:GetService("TweenService"):Create(HRP, TweenInfo.new(tweenSpeed, Enum.EasingStyle.Linear), goal)
+            tween:Play()
+            tween.Completed:Wait()
+        end
+    end
+end
+
+local stepSize = 10 
+local tweenSpeed = 0.15 
+local squareCoords = {
+    Vector3.new(542.65, 19.60, -542.77),
+    Vector3.new(-544.96, 19.60, -545.01),
+    Vector3.new(-545.68, 19.60, 545.71),
+    Vector3.new(545.50, 19.60, 544.95)
+}
+
+local coverSquareEnabled = false
+local stopCoverSquare = false
+local HRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+
+player.CharacterAdded:Connect(function(char)
+    HRP = char:WaitForChild("HumanoidRootPart")
+end)
+
+local function coverSquare()
+    local minX, maxX = math.huge, -math.huge
+    local minZ, maxZ = math.huge, -math.huge
+    local y = squareCoords[1].Y
+
+    for _, v in ipairs(squareCoords) do
+        if v.X < minX then minX = v.X end
+        if v.X > maxX then maxX = v.X end
+        if v.Z < minZ then minZ = v.Z end
+        if v.Z > maxZ then maxZ = v.Z end
+    end
+
+    while coverSquareEnabled and not stopCoverSquare do
+        for x = minX, maxX, stepSize do
+            for z = minZ, maxZ, stepSize do
+                if stopCoverSquare or not HRP then return end
+                local goal = {CFrame = CFrame.new(x, y, z)}
+                local tween = game:GetService("TweenService"):Create(HRP, TweenInfo.new(tweenSpeed, Enum.EasingStyle.Linear), goal)
+                tween:Play()
+                tween.Completed:Wait()
+            end
+        end
+    end
+end
+
+local CoverSquareToggle = Tabs.Main:AddToggle("CoverSquareToggle", { Title = "AutoFarm V2", Default = false })
+CoverSquareToggle:OnChanged(function(val)
+    coverSquareEnabled = val
+    if coverSquareEnabled then
+        stopCoverSquare = false
+        task.spawn(coverSquare)
+    else
+        stopCoverSquare = true
+    end
+end)
+
+local StepSizeSlider = Tabs.Main:AddSlider("StepSizeSlider", {
+	Title = "Step Size",
+	Default = stepSize,
+	Min = 1,
+	Max = 50,
+	Rounding = 0,
+	Callback = function(val)
+		stepSize = val
+	end
+})
+
+local TweenSpeedSlider = Tabs.Main:AddSlider("TweenSpeedSlider", {
+	Title = "Tween Speed",
+	Default = tweenSpeed,
+	Min = 0.05,
+	Max = 1,
+	Rounding = 2,
+	Callback = function(val)
+		tweenSpeed = val
+	end
+})
+
 
 local skins = {
 	"Default", "Zombie", "Noob", "Cool", "Nerd", "Nature", "Robot", "Dino",
